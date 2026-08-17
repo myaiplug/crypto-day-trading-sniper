@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Paper-trading entry point for the Crypto Day-Trading Sniper."""
+"""
+Paper-trading entry point for the Crypto Day-Trading Sniper.
+Includes wallet-flow scoring + Ritter-style tabular Q execution layer.
+"""
 from __future__ import annotations
 import logging
 from data.feed import CandleFeed
 from data.atr_cache import ATRCache
+from data.wallet_flow import WalletFlowCache
 from execution.paper_broker import PaperBroker
 from execution.trade_manager import TradeManager
+from execution.rl_execution import TabularQAgent, SetupLogger
 from live.scheduler import LiveScheduler
 from live.alerts import AlertManager
 from reporting.daily_summary import DailySummaryWriter
-from risk.position_sizing import RiskConfig
 from persistence.state import load_state
 from config.settings import (
     RISK, SCORE_THRESHOLD, PAIRS, STARTING_CASH,
@@ -28,6 +32,9 @@ def main():
     feed = CandleFeed(exchange_id="binance", sandbox=True)
     broker = PaperBroker(starting_cash=STARTING_CASH, taker_fee=0.0006, slippage_bps=1.5)
     atr_cache = ATRCache(period=14)
+    wallet_cache = WalletFlowCache()
+    rl_agent = TabularQAgent(path="rl_qtable.json")
+    setup_logger = SetupLogger(path="setup_log.jsonl")
 
     def atr_provider(pair: str) -> float:
         return atr_cache.get(pair)
@@ -54,12 +61,17 @@ def main():
         alerts=alerts,
         summary_writer=summary,
         use_websocket=True,
+        wallet_cache=wallet_cache,
+        rl_agent=rl_agent,
+        setup_logger=setup_logger,
+        use_rl=True,
     )
 
     logger.info(
-        "Paper sniper ready. Equity: %.2f | WebSocket=%s",
+        "Paper sniper ready. Equity: %.2f | WebSocket=%s | RL=%s | WalletFlow=on",
         broker.get_equity(),
         scheduler.use_websocket,
+        scheduler.use_rl,
     )
     scheduler.start()
 
