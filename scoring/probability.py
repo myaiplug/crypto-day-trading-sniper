@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 import pandas as pd
 from patterns.detectors import PatternSignal
 
@@ -20,6 +20,7 @@ def calculate_score(
     i: int,
     avg_volume_period: int = 10,
     key_levels: Optional[list[float]] = None,
+    wallet_features: Optional[Any] = None,
 ) -> ScoredSetup:
     row = df.iloc[i]
     reasons: Dict[str, float] = {}
@@ -67,7 +68,22 @@ def calculate_score(
         atr_pts = 3.0
     reasons["atr"] = atr_pts
 
-    total = pattern_pts + vol_pts + level_pts + htf_pts + rej_pts + atr_pts
+    flow_pts = 0.0
+    if wallet_features is not None:
+        z = getattr(wallet_features, "flow_zscore", 0.0)
+        align = getattr(wallet_features, "alignment", 0)
+        if align > 0:
+            flow_pts = min(12.0, 6.0 + 3.0 * abs(z))
+        elif align < 0:
+            flow_pts = 0.0
+        else:
+            flow_pts = 3.0
+    reasons["wallet_flow"] = round(flow_pts, 1)
+
+    total = (
+        pattern_pts + vol_pts + level_pts + htf_pts
+        + rej_pts + atr_pts + flow_pts
+    )
     total = max(0.0, min(100.0, total))
 
     return ScoredSetup(
