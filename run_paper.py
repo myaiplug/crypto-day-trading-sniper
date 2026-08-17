@@ -53,9 +53,14 @@ def main():
         state_path=STATE_PATH,
         alerts=alerts,
         summary_writer=summary,
+        use_websocket=True,
     )
 
-    logger.info("Paper sniper ready. Equity: %.2f", broker.get_equity())
+    logger.info(
+        "Paper sniper ready. Equity: %.2f | WebSocket=%s",
+        broker.get_equity(),
+        scheduler.use_websocket,
+    )
     scheduler.start()
 
 
