@@ -1,12 +1,12 @@
 {
   "name": "Crypto Sniper Control",
   "short_name": "Sniper",
-  "description": "Easy control panel for the day-trading sniper",
+  "description": "Mobile control panel for the day-trading sniper",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0A0A0F",
   "theme_color": "#0A0A0F",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
   "icons": [
     {
       "src": "/static/icon-192.png",

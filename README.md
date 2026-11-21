@@ -67,3 +67,24 @@ pytest tests/ -v
 ## Disclaimer
 
 This system is a research and paper-trading framework. Most retail day traders lose money. Past simulated results do not guarantee future performance. Never risk capital you cannot afford to lose.
+
+## Android / Mobile
+
+The control GUI is a mobile-first PWA.
+
+### On your phone (recommended)
+1. Run the server on a machine reachable from the phone (or Termux on the phone itself).
+2. Open `http://<ip>:8000` in Chrome.
+3. Menu → Add to Home Screen. It installs as a standalone app.
+
+### Run fully on Android (Termux)
+```bash
+pkg update && pkg install python git
+git clone https://github.com/myaiplug/crypto-day-trading-sniper
+cd crypto-day-trading-sniper
+pip install -r requirements.txt
+python run_gui.py
+```
+Then open `http://127.0.0.1:8000` in the phone browser and add to home screen.
+
+Touch targets, safe-area insets, and WebSocket reconnect are handled for Android.

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="/static/manifest.json">
+<title>Sniper Control</title>
+<style>
+:root {
+  --bg: #0A0A0F;
+  --surf: #12121A;
+  --bdr: #1E1E2A;
+  --cyan: #22D3EE;
+  --green: #10B981;
+  --red: #EF4444;
+  --amber: #F59E0B;
+  --text: #E2E8F0;
+  --mut: #64748B;
+  --safe-top: env(safe-area-inset-top);
+  --safe-bot: env(safe-area-inset-bottom);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+body { padding: var(--safe-top) 0 var(--safe-bot); }
+header { padding: 14px 16px; background: var(--surf); border-bottom: 1px solid var(--bdr); display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+.logo { font-weight: 700; letter-spacing: 0.12em; color: var(--cyan); font-size: 15px; }
+.status-pill { font-size: 11px; padding: 4px 10px; border-radius: 99px; background: #1E293B; color: var(--mut); }
+.status-pill.live { background: rgba(16,185,129,.15); color: var(--green); }
+.status-pill.paused { background: rgba(245,158,11,.15); color: var(--amber); }
+main { padding: 12px 16px 80px; max-width: 480px; margin: 0 auto; }
+.card { background: var(--surf); border: 1px solid var(--bdr); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.card h2 { font-size: 11px; letter-spacing: 0.16em; color: var(--mut); text-transform: uppercase; margin-bottom: 10px; }
+.equity { font-size: 28px; font-weight: 700; }
+.pnl { font-size: 14px; margin-top: 4px; }
+.pnl.pos { color: var(--green); }
+.pnl.neg { color: var(--red); }
+.row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1a1a24; font-size: 14px; }
+.row:last-child { border: 0; }
+.controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+button { background: #1E293B; border: 1px solid #334155; color: var(--text); padding: 14px 8px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+button:active { transform: scale(.97); }
+button.start { background: rgba(16,185,129,.15); border-color: var(--green); color: var(--green); }
+button.pause { background: rgba(245,158,11,.12); border-color: var(--amber); color: var(--amber); }
+button.flat { background: rgba(239,68,68,.12); border-color: var(--red); color: var(--red); }
+.pos-item { padding: 10px 0; border-bottom: 1px solid #1a1a24; font-size: 13px; }
+.pos-item:last-child { border: 0; }
+.setup { padding: 10px 0; border-bottom: 1px solid #1a1a24; font-size: 13px; }
+.score { color: var(--cyan); font-weight: 700; }
+.empty { color: var(--mut); font-size: 13px; text-align: center; padding: 16px 0; }
+.risk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 12px; }
+.risk-item { background: #0F0F16; padding: 8px; border-radius: 8px; }
+.risk-item span { display: block; color: var(--mut); font-size: 10px; }
+footer { position: fixed; bottom: 0; left: 0; right: 0; background: var(--surf); border-top: 1px solid var(--bdr); padding: 8px 16px calc(8px + var(--safe-bot)); display: flex; justify-content: space-around; font-size: 11px; color: var(--mut); }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">SNIPER</div>
+  <div class="status-pill" id="statusPill">STANDBY</div>
+</header>
+
+<main>
+  <div class="card">
+    <h2>EQUITY</h2>
+    <div class="equity" id="equity">$10,000.00</div>
+    <div class="pnl" id="pnl">+0.00 (0.00%)</div>
+  </div>
+
+  <div class="card">
+    <h2>CONTROL</h2>
+    <div class="controls">
+      <button class="start" onclick="cmd('start')">START</button>
+      <button class="pause" onclick="cmd('pause')">PAUSE</button>
+      <button class="flat" onclick="cmd('flatten')">FLATTEN</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>OPEN POSITIONS</h2>
+    <div id="positions"><div class="empty">No open positions</div></div>
+  </div>
+
+  <div class="card">
+    <h2>RECENT SETUPS</h2>
+    <div id="setups"><div class="empty">No setups yet</div></div>
+  </div>
+
+  <div class="card">
+    <h2>RISK</h2>
+    <div class="risk-grid" id="risk"></div>
+  </div>
+</main>
+
+<footer>
+  <span id="trades">0 trades</span>
+  <span id="updated">—</span>
+</footer>
+
+<script>
+async function fetchJSON(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error(r.status);
+  return r.json();
+}
+
+async function refresh() {
+  try {
+    const s = await fetchJSON('/api/status');
+    document.getElementById('equity').textContent = '$' + s.equity.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    const pnl = document.getElementById('pnl');
+    const sign = s.daily_pnl >= 0 ? '+' : '';
+    pnl.textContent = sign + s.daily_pnl.toFixed(2) + ' (' + sign + s.daily_pnl_pct.toFixed(2) + '%)';
+    pnl.className = 'pnl ' + (s.daily_pnl >= 0 ? 'pos' : 'neg');
+
+    const pill = document.getElementById('statusPill');
+    if (s.running && !s.paused) { pill.textContent = 'LIVE'; pill.className = 'status-pill live'; }
+    else if (s.paused) { pill.textContent = 'PAUSED'; pill.className = 'status-pill paused'; }
+    else { pill.textContent = 'STANDBY'; pill.className = 'status-pill'; }
+
+    const posEl = document.getElementById('positions');
+    if (!s.open_positions || s.open_positions.length === 0) {
+      posEl.innerHTML = '<div class="empty">No open positions</div>';
+    } else {
+      posEl.innerHTML = s.open_positions.map(p => `
+        <div class="pos-item">
+          <strong>${p.symbol || p.pair}</strong> · ${p.direction || ''} · qty ${p.qty ?? p.remaining_qty ?? ''}
+          <div style="color:var(--mut);font-size:12px">entry ${p.entry || p.avg_price || ''} · stop ${p.stop || p.current_stop || ''}</div>
+        </div>`).join('');
+    }
+
+    const setups = await fetchJSON('/api/setups');
+    const setEl = document.getElementById('setups');
+    if (!setups.setups || setups.setups.length === 0) {
+      setEl.innerHTML = '<div class="empty">No setups yet</div>';
+    } else {
+      setEl.innerHTML = setups.setups.slice(-5).reverse().map(s => `
+        <div class="setup">
+          <strong>${s.symbol}</strong> · ${s.direction} · <span class="score">${s.score}</span>
+          <div style="color:var(--mut);font-size:12px">${s.pattern || ''}</div>
+        </div>`).join('');
+    }
+
+    const risk = s.risk || {};
+    document.getElementById('risk').innerHTML = `
+      <div class="risk-item"><span>Risk/Trade</span>${risk.risk_per_trade_pct}%</div>
+      <div class="risk-item"><span>Max Open</span>${risk.max_open_risk_pct}%</div>
+      <div class="risk-item"><span>Daily Limit</span>${risk.daily_loss_limit_pct}%</div>
+      <div class="risk-item"><span>Score Thresh</span>${risk.score_threshold}</div>
+    `;
+
+    document.getElementById('trades').textContent = (s.trades_today || 0) + ' trades';
+    document.getElementById('updated').textContent = new Date().toLocaleTimeString();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function cmd(action) {
+  try {
+    await fetchJSON('/api/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action })
+    });
+    refresh();
+  } catch (e) {
+    alert('Command failed');
+  }
+}
+
+// WebSocket live updates
+let ws;
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(proto + '://' + location.host + '/ws');
+  ws.onmessage = () => refresh();
+  ws.onclose = () => setTimeout(connectWS, 3000);
+}
+connectWS();
+setInterval(refresh, 4000);
+refresh();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js');
+}
+</script>
+</body>
+</html>
